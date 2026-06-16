@@ -1,0 +1,6 @@
+{
+  "name": "Deportes Jódar",
+  "description": "Página web para la inscripción en los diferentes deportes de Jódar: Tenis, Pádel, Deportes adaptados, Atletismo, Baloncesto y Fútbol.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
