@@ -5,27 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Deportes Jódar - Portal de Inscripciones Oficiales</title>
   
-  <!-- Tailwind CDN and custom styles -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-            display: ['Outfit', 'sans-serif'],
-            mono: ['JetBrains Mono', 'monospace'],
-          },
-          colors: {
-            brand: '#0052cc',
-            'brand-hover': '#0747a6',
-            'brand-light': '#f0f7ff',
-          }
-        }
-      }
-    }
-  </script>
-  <link rel="stylesheet" href="style.css" />
+  <!-- Custom styles compiled with Tailwind CSS -->
+  <link rel="stylesheet" href="./style.css" />
   
   <!-- Add initial page animation classes directly -->
   <style>
@@ -599,7 +580,7 @@
           <div>
             <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest font-mono mb-1.5">Ventajas Incluidas</h4>
             <ul id="detail-sport-features" class="space-y-1.5">
-              <!-- Rendered via JSrwa -->
+              <!-- Rendered via JS -->
             </ul>
           </div>
         </div>
@@ -620,8 +601,8 @@
   </div>
 
 
-  <!-- Loader scripts -->
-  <script src="app.js"></script>
+  <!-- Loader scripts using modern ES modules -->
+  <script type="module" src="./app.js"></script>
 
 </body>
 </html>
