@@ -195,29 +195,77 @@ function loadLocalStorage() {
   }
 }
 
+// Helper to check DNI or NIE
+function validateDocument(docType, docValue) {
+  if (docType === 'No_Dispone') return true;
+  if (docType === 'Pasaporte') return docValue.trim().length > 3;
+  
+  const validChars = 'TRWAGMYFPDXBNJZSQVHLCKET';
+  const nifRexp = /^[0-9]{8}[TRWAGMYFPDXBNJZSQVHLCKET]$/i;
+  const nieRexp = /^[XYZ][0-9]{7}[TRWAGMYFPDXBNJZSQVHLCKET]$/i;
+  let str = docValue.toString().toUpperCase().trim();
+
+  if (docType === 'DNI' && !nifRexp.test(str)) return false;
+  if (docType === 'NIE' && !nieRexp.test(str)) return false;
+
+  const nie = str
+      .replace(/^[X]/i, '0')
+      .replace(/^[Y]/i, '1')
+      .replace(/^[Z]/i, '2');
+
+  const letter = str.substr(-1);
+  const charIndex = parseInt(nie.substr(0, 8)) % 23;
+
+  return validChars.charAt(charIndex) === letter;
+}
+
 // Pre-fill user inputs helper
 function fillInputsFromUser(user) {
+  if (!user) return;
   const inputs = {
-    "reg-dni": user.dni,
-    "reg-name": user.fullName,
+    "reg-doc-type": user.docType,
+    "reg-doc-number": user.documentNumber,
+    "reg-name": user.firstName,
+    "reg-lastname": user.lastName,
     "reg-email": user.email,
     "reg-phone": user.phone,
     "reg-birthdate": user.birthdate,
     "reg-gender": user.gender,
     "reg-conditions": user.medicalConditions,
-    "wiz-dni": user.dni,
-    "wiz-name": user.fullName,
-    "wiz-email": user.email,
-    "wiz-phone": user.phone,
-    "wiz-birthdate": user.birthdate,
-    "wiz-gender": user.gender,
-    "wiz-conditions": user.medicalConditions
+    
+    // Clothing
+    "reg-cloth-shirt": user.clothing?.shirt,
+    "reg-cloth-pants": user.clothing?.pants,
+    "reg-cloth-tracksuit-top": user.clothing?.tracksuitTop,
+    "reg-cloth-tracksuit-bottom": user.clothing?.tracksuitBottom,
   };
 
   Object.entries(inputs).forEach(([id, val]) => {
     const el = document.getElementById(id);
     if (el) el.value = val || "";
   });
+
+  // Minor checkbox
+  const isMinorCheckbox = document.getElementById("reg-is-minor");
+  if (isMinorCheckbox) {
+    isMinorCheckbox.checked = !!user.isMinorOrOtherPayer;
+    document.getElementById("parent-section").classList.toggle("hidden", !user.isMinorOrOtherPayer);
+  }
+
+  // Parent inputs
+  if (user.parentData) {
+    const parentInputs = {
+      "reg-parent-doc-type": user.parentData.docType,
+      "reg-parent-doc-number": user.parentData.documentNumber,
+      "reg-parent-name": user.parentData.name,
+      "reg-parent-email": user.parentData.email,
+      "reg-parent-phone": user.parentData.phone
+    };
+    Object.entries(parentInputs).forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      if (el) el.value = val || "";
+    });
+  }
 }
 
 // Update core dynamic UI statuses
@@ -230,16 +278,20 @@ function updateUIState() {
   if (currentUser) {
     if (heroRegisterBtn) heroRegisterBtn.classList.add("hidden");
     if (profileHeaderArea) {
-      const initials = currentUser.fullName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+      const nameStr = currentUser.firstName || currentUser.fullName || "";
+      const lastStr = currentUser.lastName ? currentUser.lastName.charAt(0) : (currentUser.fullName ? currentUser.fullName.split(' ')[1]?.charAt(0) || "" : "");
+      let initials = (nameStr.charAt(0) + lastStr).toUpperCase().substring(0, 2);
+      const docLabel = currentUser.docType === 'No_Dispone' ? 'Menor sin DNI' : `${currentUser.docType || 'DNI'}: ${currentUser.documentNumber || currentUser.dni}`;
+
       profileHeaderArea.innerHTML = `
         <div class="flex items-center gap-2.5 bg-slate-50 p-1.5 pl-3 rounded-full border border-slate-100">
           <div class="hidden sm:block text-right pr-1">
-            <p class="text-xs font-semibold text-slate-800 leading-none">${currentUser.fullName}</p>
-            <span class="text-[10px] text-slate-400 font-mono">DNI: ${currentUser.dni}</span>
+            <p class="text-xs font-semibold text-slate-800 leading-none">${currentUser.firstName || currentUser.fullName}</p>
+            <span class="text-[10px] text-slate-400 font-mono">${docLabel}</span>
           </div>
-          <div class="w-8 h-8 rounded-full bg-[#0052cc] text-white font-bold text-xs flex items-center justify-center shadow-xs">
+          <a href="./profile.html" title="Mi Perfil" class="w-8 h-8 rounded-full bg-[#0052cc] hover:bg-opacity-90 transition-opacity text-white font-bold text-xs flex items-center justify-center shadow-xs cursor-pointer">
             ${initials}
-          </div>
+          </a>
           <button id="logout-btn" title="Cerrar sesión" class="p-1 px-2.5 hover:bg-rose-50 hover:text-rose-600 rounded-full text-xs font-semibold text-slate-400 transition-all cursor-pointer">
             Salir
           </button>
@@ -704,6 +756,12 @@ window.startInscribe = function(sportId) {
   const sport = sportsData.find(s => s.id === sportId);
   if (!sport) return;
 
+  if (!currentUser) {
+    showToast("Debes registrar tu ficha primero antes de inscribirte.", "info");
+    openModal("register-modal");
+    return;
+  }
+
   wizardActiveSportId = sportId;
   const logoHeader = document.getElementById("wizard-sport-logo-header");
   const nameHeader = document.getElementById("wizard-sport-name-header");
@@ -716,15 +774,6 @@ window.startInscribe = function(sportId) {
   if (scheduleSelect) {
     const options = sport.schedule.split('|');
     scheduleSelect.innerHTML = options.map(opt => `<option value="${opt.trim()}">${opt.trim()}</option>`).join("");
-  }
-
-  // if user is pre-registered, jump straight to step 2 selection details
-  if (currentUser) {
-    currentWizardStep = 2;
-    goToWizardStep(2);
-  } else {
-    currentWizardStep = 1;
-    goToWizardStep(1);
   }
 
   openModal("enroll-modal");
@@ -770,70 +819,147 @@ function goToWizardStep(step) {
 
 // Form submissions
 function setupFormSubmissions() {
+  const docTypeSelect = document.getElementById("reg-doc-type");
+  const docNumberInput = document.getElementById("reg-doc-number");
+
+  if (docTypeSelect && docNumberInput) {
+    docTypeSelect.addEventListener("change", (e) => {
+      if (e.target.value === "No_Dispone") {
+        docNumberInput.value = "";
+        docNumberInput.disabled = true;
+        docNumberInput.classList.add("opacity-50", "cursor-not-allowed");
+      } else {
+        docNumberInput.disabled = false;
+        docNumberInput.classList.remove("opacity-50", "cursor-not-allowed");
+      }
+    });
+  }
+
+  // Minor logic toggle
+  const isMinorCheckbox = document.getElementById("reg-is-minor");
+  const parentSection = document.getElementById("parent-section");
+  const birthdateInput = document.getElementById("reg-birthdate");
+
+  if (isMinorCheckbox && parentSection) {
+    isMinorCheckbox.addEventListener("change", (e) => {
+      parentSection.classList.toggle("hidden", !e.target.checked);
+    });
+  }
+
+  if (birthdateInput && isMinorCheckbox) {
+    birthdateInput.addEventListener("change", (e) => {
+      if (!e.target.value) return;
+      const bDate = new Date(e.target.value);
+      const diff = Date.now() - bDate.getTime();
+      const ageDate = new Date(diff); 
+      const age = Math.abs(ageDate.getUTCFullYear() - 1970);
+      if (age < 18) {
+        isMinorCheckbox.checked = true;
+        parentSection.classList.remove("hidden");
+      }
+    });
+  }
+
+  // Copy Self Parent btn
+  const copyParentBtn = document.getElementById("btn-copy-self-parent");
+  if (copyParentBtn) {
+    copyParentBtn.addEventListener("click", () => {
+      document.getElementById("reg-parent-doc-type").value = document.getElementById("reg-doc-type").value;
+      document.getElementById("reg-parent-doc-number").value = document.getElementById("reg-doc-number").value;
+      document.getElementById("reg-parent-name").value = document.getElementById("reg-name").value + " " + document.getElementById("reg-lastname").value;
+      document.getElementById("reg-parent-email").value = document.getElementById("reg-email").value;
+      document.getElementById("reg-parent-phone").value = document.getElementById("reg-phone").value;
+    });
+  }
+
   // Global profile register form
   const registerForm = document.getElementById("profile-register-form");
   if (registerForm) {
     registerForm.addEventListener("submit", (e) => {
       e.preventDefault();
-      const dni = document.getElementById("reg-dni").value.toUpperCase().trim();
+      
+      const docType = document.getElementById("reg-doc-type").value;
+      const docNumber = document.getElementById("reg-doc-number").value.toUpperCase().trim();
       const name = document.getElementById("reg-name").value.trim();
+      const lastname = document.getElementById("reg-lastname").value.trim();
       const email = document.getElementById("reg-email").value.trim();
       const phone = document.getElementById("reg-phone").value.trim();
       const birthdate = document.getElementById("reg-birthdate").value;
       const gender = document.getElementById("reg-gender").value;
       const conditions = document.getElementById("reg-conditions").value.trim();
+      
+      const clothShirt = document.getElementById("reg-cloth-shirt").value;
+      const clothPants = document.getElementById("reg-cloth-pants").value;
+      const tracksuitTop = document.getElementById("reg-cloth-tracksuit-top").value;
+      const tracksuitBottom = document.getElementById("reg-cloth-tracksuit-bottom").value;
 
-      if (!dni || !name || !email || !phone) {
-        showToast("Por favor complete todos los datos obligatorios.", "error");
+      if (!validateDocument(docType, docNumber)) {
+        showToast("El número de documento no es válido. Compruebe la letra y formato.", "error");
         return;
       }
 
-      currentUser = { dni, fullName: name, email, phone, birthdate, gender, medicalConditions: conditions };
+      if (!name || !lastname || !email || !phone || !birthdate || !gender || !clothShirt || !clothPants) {
+        showToast("Por favor complete todos los datos obligatorios marcados con asterisco.", "error");
+        return;
+      }
+
+      const isMinorOrOther = document.getElementById("reg-is-minor").checked;
+      let parentData = null;
+
+      if (isMinorOrOther) {
+        const pDocType = document.getElementById("reg-parent-doc-type").value;
+        const pDocNumber = document.getElementById("reg-parent-doc-number").value.toUpperCase().trim();
+        const pName = document.getElementById("reg-parent-name").value.trim();
+        const pEmail = document.getElementById("reg-parent-email").value.trim();
+        const pPhone = document.getElementById("reg-parent-phone").value.trim();
+
+        if (!validateDocument(pDocType, pDocNumber)) {
+          showToast("El documento del responsable no es válido.", "error");
+          return;
+        }
+
+        if (!pName || !pEmail || !pPhone) {
+          showToast("Revisa los datos obligatorios del tutor / responsable.", "error");
+          return;
+        }
+
+        parentData = {
+          docType: pDocType,
+          documentNumber: pDocNumber,
+          name: pName,
+          email: pEmail,
+          phone: pPhone
+        };
+      }
+
+      currentUser = { 
+        docType,
+        documentNumber: docNumber,
+        dni: docNumber, // Fallback alias
+        firstName: name, 
+        lastName: lastname,
+        fullName: `${name} ${lastname}`, // Fallback alias
+        email, 
+        phone, 
+        birthdate, 
+        gender, 
+        medicalConditions: conditions,
+        clothing: {
+          shirt: clothShirt,
+          pants: clothPants,
+          tracksuitTop: tracksuitTop,
+          tracksuitBottom: tracksuitBottom
+        },
+        isMinorOrOtherPayer: isMinorOrOther,
+        parentData
+      };
+
       localStorage.setItem('jodar_sport_user', JSON.stringify(currentUser));
       // sync wizard fields
       fillInputsFromUser(currentUser);
       closeAllModals();
       updateUIState();
       showToast(`¡Perfil guardado! Bienvenido a Deportes Jódar, ${name}.`, "success");
-    });
-  }
-
-  // Wizard forms actions (Back and Next buttons)
-  const wizNextBtn = document.getElementById("wiz-next-step-btn");
-  if (wizNextBtn) {
-    wizNextBtn.addEventListener("click", () => {
-      const dni = document.getElementById("wiz-dni").value.toUpperCase().trim();
-      const name = document.getElementById("wiz-name").value.trim();
-      const email = document.getElementById("wiz-email").value.trim();
-      const phone = document.getElementById("wiz-phone").value.trim();
-
-      if (!dni || !name || !email || !phone) {
-        showToast("Por favor complete todos los campos requeridos.", "error");
-        return;
-      }
-
-      // save temporary registration first to local scope
-      currentUser = {
-        dni,
-        fullName: name,
-        email,
-        phone,
-        birthdate: document.getElementById("wiz-birthdate").value,
-        gender: document.getElementById("wiz-gender").value,
-        medicalConditions: document.getElementById("wiz-conditions").value.trim()
-      };
-      localStorage.setItem('jodar_sport_user', JSON.stringify(currentUser));
-      fillInputsFromUser(currentUser);
-      currentWizardStep = 2;
-      goToWizardStep(2);
-    });
-  }
-
-  const wizBackBtn = document.getElementById("wiz-back-step-btn");
-  if (wizBackBtn) {
-    wizBackBtn.addEventListener("click", () => {
-      currentWizardStep = 1;
-      goToWizardStep(1);
     });
   }
 
@@ -844,7 +970,7 @@ function setupFormSubmissions() {
       e.preventDefault();
       if (!wizardActiveSportId) return;
 
-      const userDni = currentUser ? currentUser.dni : document.getElementById("wiz-dni").value.toUpperCase().trim();
+      const userDni = currentUser ? (currentUser.documentNumber || currentUser.dni) : "UNKNOWN";
       
       // doublecheck duplicate enrollments
       const isDuplicated = enrollments.some(item => item.sportId === wizardActiveSportId && item.userDni === userDni);
