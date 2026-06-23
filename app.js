@@ -875,7 +875,7 @@ function setupFormSubmissions() {
   // Global profile register form
   const registerForm = document.getElementById("profile-register-form");
   if (registerForm) {
-    registerForm.addEventListener("submit", (e) => {
+    registerForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       
       const docType = document.getElementById("reg-doc-type").value;
@@ -954,12 +954,48 @@ function setupFormSubmissions() {
         parentData
       };
 
-      localStorage.setItem('jodar_sport_user', JSON.stringify(currentUser));
-      // sync wizard fields
-      fillInputsFromUser(currentUser);
-      closeAllModals();
-      updateUIState();
-      showToast(`¡Perfil guardado! Bienvenido a Deportes Jódar, ${name}.`, "success");
+      const submitBtn = registerForm.querySelector('button[type="submit"]');
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = "Guardando en el servidor...";
+      submitBtn.disabled = true;
+      submitBtn.classList.add("opacity-75", "cursor-wait");
+
+      try {
+        const urlBackend = "http://127.0.0.1:5001/deportesjodar-5e62f/us-central1/registrarAlta";
+        const response = await fetch(urlBackend, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(currentUser)
+        });
+
+        if (!response.ok) {
+          throw new Error("Error del servidor HTTP " + response.status);
+        }
+
+        const datos = await response.json();
+        
+        if (datos.error) {
+          throw new Error(datos.error);
+        }
+
+        // Si se guarda correctamente en backend, actualizamos frontend
+        localStorage.setItem('jodar_sport_user', JSON.stringify(currentUser));
+        // sync wizard fields
+        fillInputsFromUser(currentUser);
+        closeAllModals();
+        updateUIState();
+        showToast(datos.mensaje || `¡Perfil guardado! Bienvenido a Deportes Jódar, ${name}.`, "success");
+
+      } catch (error) {
+        console.error("Error guardando perfil:", error);
+        showToast("Hubo un error al guardar el perfil en el servidor. Asegúrate de que el emulador esté activo.", "error");
+      } finally {
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
+        submitBtn.classList.remove("opacity-75", "cursor-wait");
+      }
     });
   }
 
