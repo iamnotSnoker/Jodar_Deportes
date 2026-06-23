@@ -1176,7 +1176,7 @@ function showToast(message, type = "success") {
 }
 
 window.probarConexion = async function probarConexion() {
-    const urlBackend = "http://127.0.0.1:5001/deportesjodar-5e62f/us-central1/registrarAlta"; 
+    const urlBackend = "http://127.0.0.1:4400/deportesjodar-5e62f/us-central1/registrarAlta"; 
 
     try {
         const respuesta = await fetch(urlBackend, {
