@@ -1133,3 +1133,22 @@ function showToast(message, type = "success") {
     setTimeout(() => container.remove(), 300);
   }, 4000);
 }
+
+window.probarConexion = async function probarConexion() {
+    const urlBackend = "http://127.0.0.1:5001/deportesjodar-5e62f/us-central1/registrarAlta"; 
+
+    try {
+        const respuesta = await fetch(urlBackend, {
+            method: "POST"
+        });
+
+        const datos = await respuesta.json();
+        
+        // Muestra el alert con el texto que devuelve el backend ("¡Estoy vivo!")
+        alert(datos.mensaje); 
+
+    } catch (error) {
+        console.error("Error al conectar al backend local:", error);
+        alert("No se pudo conectar con el backend local. Asegúrate de que el emulador de Firebase está corriendo.");
+    }
+}
