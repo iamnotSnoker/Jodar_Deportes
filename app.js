@@ -970,11 +970,16 @@ function setupFormSubmissions() {
           body: JSON.stringify(currentUser)
         });
 
-        if (!response.ok) {
+        let datos;
+        try {
+          datos = await response.json();
+        } catch (err) {
           throw new Error("Error del servidor HTTP " + response.status);
         }
 
-        const datos = await response.json();
+        if (!response.ok) {
+          throw new Error(datos.error || "Error del servidor HTTP " + response.status);
+        }
         
         if (datos.error) {
           throw new Error(datos.error);
